@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../service/auth.dart';
 import '../widgets/sequetrics_app_bar.dart';
 import '../widgets/sequetrics_bottom_nav.dart';
 
@@ -11,11 +12,69 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _dataRetention = true;
   String _audioQuality = 'high';
+  final AuthService _authService = AuthService();
+  String? _userEmail;
 
-  void _logout() {
-    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+  @override
+  void initState() {
+    super.initState();
+    _loadUserEmail();
+  }
+
+  Future<void> _loadUserEmail() async {
+    final email = await _authService.getEmail();
+    setState(() {
+      _userEmail = email;
+    });
+  }
+
+  void _showQualityWarning() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Quality Warning'),
+        content: const Text(
+          'Changing audio quality from High may affect the accuracy of speech recognition and is not recommended. Lower quality settings can result in less accurate transcriptions.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _authService.logout();
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    }
   }
 
   @override
@@ -52,12 +111,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text('Guest User'),
-                            SizedBox(height: 4),
+                          children: [
+                            // const Text(
+                            //   'User Name',
+                            //   style: TextStyle(
+                            //     fontWeight: FontWeight.w600,
+                            //     fontSize: 16,
+                            //   ),
+                            // ),
+                            // const SizedBox(height: 4),
                             Text(
-                              'guest@sequetrics.com',
-                              style: TextStyle(color: Colors.grey),
+                              _userEmail ?? 'Loading...',
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
@@ -102,52 +170,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: (value) {
                           if (value == null) return;
                           setState(() => _audioQuality = value);
+
+                          if (value != 'high') {
+                            _showQualityWarning();
+                          }
                         },
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Data & Privacy',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  'Local Data Retention',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Keep analysis history on device',
+                      if (_audioQuality != 'high') ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.orange.shade200,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.orange.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'This setting may affect the quality of recognition and is not recommended to change.',
                                   style: TextStyle(
-                                    color: Colors.grey,
+                                    color: Colors.orange.shade900,
                                     fontSize: 12,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          Switch(
-                            value: _dataRetention,
-                            onChanged: (value) =>
-                                setState(() => _dataRetention = value),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -201,6 +263,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-
-

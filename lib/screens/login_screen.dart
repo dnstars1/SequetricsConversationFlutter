@@ -56,12 +56,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final email = _emailController.text.trim();
       final token = await _apiService.login(
-        _emailController.text.trim(),
+        email,
         _passwordController.text,
       );
 
       await _authService.saveToken(token);
+      await _authService.saveEmail(email);
 
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/dashboard');
@@ -83,12 +85,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final email = _emailController.text.trim();
       final result = await _apiService.register(
-        _emailController.text.trim(),
+        email,
         _passwordController.text,
       );
 
       await _authService.saveToken(result['access_token']!);
+      await _authService.saveEmail(email);
 
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/dashboard');
@@ -102,10 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  void _navigateToDashboard() {
-    Navigator.of(context).pushReplacementNamed('/dashboard');
   }
 
   @override
@@ -217,11 +217,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: _isLoading ? null : _handleRegister,
                             child: const Text('Sign Up'),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: _isLoading ? null : _navigateToDashboard,
-                          child: const Text('Continue as Guest'),
                         ),
                       ],
                     ),

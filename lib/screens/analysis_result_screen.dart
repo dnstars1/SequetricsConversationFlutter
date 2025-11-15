@@ -1,15 +1,57 @@
 import 'package:flutter/material.dart';
 
+import '../service/api.dart';
 import '../widgets/sequetrics_app_bar.dart';
 import '../widgets/sequetrics_bottom_nav.dart';
 
-class AnalysisResultScreen extends StatelessWidget {
+class AnalysisResultScreen extends StatefulWidget {
   const AnalysisResultScreen({
     required this.analysisId,
     super.key,
   });
 
   final String analysisId;
+
+  @override
+  State<AnalysisResultScreen> createState() => _AnalysisResultScreenState();
+}
+
+class _AnalysisResultScreenState extends State<AnalysisResultScreen> {
+  final ApiService _apiService = ApiService();
+  VoiceTranscript? _transcript;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTranscript();
+  }
+
+  Future<void> _loadTranscript() async {
+    try {
+      final history = await _apiService.getHistory(limit: 100);
+      final transcript = history.firstWhere(
+            (item) => item.id.toString() == widget.analysisId,
+        orElse: () => throw ApiException('Transcript not found'),
+      );
+
+      setState(() {
+        _transcript = transcript;
+        _isLoading = false;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _errorMessage = e.message;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load transcript: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   void _showSnack(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -20,7 +62,7 @@ class AnalysisResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final routeName =
-        ModalRoute.of(context)?.settings.name ?? '/analysis/$analysisId';
+        ModalRoute.of(context)?.settings.name ?? '/analysis/${widget.analysisId}';
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -28,61 +70,109 @@ class AnalysisResultScreen extends StatelessWidget {
         title: 'Analysis Results',
         showBack: true,
       ),
-      body: SafeArea(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red.shade300,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Error',
+                style: theme.textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Go Back'),
+              ),
+            ],
+          ),
+        ),
+      )
+          : SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
           child: Column(
             children: [
               Card(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: Colors.amber, width: 4),
-                    ),
-                  ),
+                child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.warning_rounded,
-                        color: Colors.amber,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Possible Defect Mention Detected',
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Analysis Details',
                               style: theme.textTheme.titleMedium,
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Analysis identified potential runway surface issue',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                '92% confidence match',
-                                style: TextStyle(
-                                  color: Color(0xFF92400E),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _InfoRow(
+                        label: 'ID',
+                        value: _transcript!.id.toString(),
+                      ),
+                      const SizedBox(height: 8),
+                      _InfoRow(
+                        label: 'Created',
+                        value: _formatDate(_transcript!.createdAt),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Summary',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.blue.shade200,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _transcript!.summary,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
                         ),
                       ),
                     ],
@@ -97,7 +187,7 @@ class AnalysisResultScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Transcript',
+                        'Full Transcript',
                         style: theme.textTheme.titleMedium,
                       ),
                       const SizedBox(height: 12),
@@ -108,117 +198,50 @@ class AnalysisResultScreen extends StatelessWidget {
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            _TranscriptLine(
-                              timestamp: '[00:12]',
-                              speaker: 'Tower',
-                              text:
-                                  '"Alpha-Bravo-123, cleared for takeoff runway 27L"',
-                            ),
-                            _TranscriptLine(
-                              timestamp: '[00:18]',
-                              speaker: 'AB-123',
-                              text:
-                                  '"Cleared for takeoff 27L, Alpha-Bravo-123"',
-                            ),
-                            _TranscriptLine(
-                              timestamp: '[00:45]',
-                              speaker: 'AB-123',
-                              text:
-                                  '"Tower, Alpha-Bravo-123, we\'re seeing debris on the runway surface, approximately 1000 feet ahead"',
-                              highlight:
-                                  'we\'re seeing debris on the runway surface',
-                            ),
-                            _TranscriptLine(
-                              timestamp: '[00:52]',
-                              speaker: 'Tower',
-                              text:
-                                  '"Alpha-Bravo-123, abort takeoff, abort takeoff"',
-                            ),
-                            _TranscriptLine(
-                              timestamp: '[00:55]',
-                              speaker: 'AB-123',
-                              text: '"Aborting takeoff, Alpha-Bravo-123"',
-                            ),
-                          ],
+                        child: Text(
+                          _transcript!.transcript,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.6,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Proposed Actions',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 16),
-                      const _ActionTile(
-                        icon: Icons.check_circle_rounded,
-                        iconColor: Color(0xFF2563EB),
-                        backgroundColor: Color(0xFFDBEAFE),
-                        title: 'Dispatch inspection crew to runway 27L',
-                        subtitle: 'Priority: High',
-                      ),
-                      const SizedBox(height: 12),
-                      const _ActionTile(
-                        icon: Icons.warning_rounded,
-                        iconColor: Color(0xFFD97706),
-                        backgroundColor: Color(0xFFFDE68A),
-                        title: 'Close runway 27L temporarily',
-                        subtitle: 'Until inspection complete',
-                      ),
-                      const SizedBox(height: 12),
-                      _ActionTile(
-                        icon: Icons.assignment_turned_in_rounded,
-                        iconColor: Colors.grey.shade700,
-                        backgroundColor: Colors.grey.shade200,
-                        title: 'Log incident in safety management system',
-                        subtitle: 'Required documentation',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _showSnack(context, 'Analysis saved to history'),
-                      icon: const Icon(Icons.save_rounded),
-                      label: const Text('Save'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _showSnack(context, 'PDF exported successfully'),
-                      icon: const Icon(Icons.file_download_rounded),
-                      label: const Text('Export PDF'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _showSnack(context, 'Share link copied to clipboard'),
-                      icon: const Icon(Icons.share_rounded),
-                      label: const Text('Share'),
-                    ),
-                  ),
-                ],
-              ),
+              // const SizedBox(height: 16),
+              // Row(
+              //   children: [
+              //     Expanded(
+              //       child: OutlinedButton.icon(
+              //         onPressed: () =>
+              //             _showSnack(context, 'Analysis saved to history'),
+              //         icon: const Icon(Icons.save_rounded),
+              //         label: const Text('Save'),
+              //       ),
+              //     ),
+              //     const SizedBox(width: 12),
+              //     Expanded(
+              //       child: OutlinedButton.icon(
+              //         onPressed: () =>
+              //             _showSnack(context, 'PDF exported successfully'),
+              //         icon: const Icon(Icons.file_download_rounded),
+              //         label: const Text('Export PDF'),
+              //       ),
+              //     ),
+              //     const SizedBox(width: 12),
+              //     Expanded(
+              //       child: OutlinedButton.icon(
+              //         onPressed: () =>
+              //             _showSnack(context, 'Share link copied to clipboard'),
+              //         icon: const Icon(Icons.share_rounded),
+              //         label: const Text('Share'),
+              //       ),
+              //     ),
+              //   ],
+              // ),
             ],
           ),
         ),
@@ -226,127 +249,57 @@ class AnalysisResultScreen extends StatelessWidget {
       bottomNavigationBar: SequetricsBottomNav(currentRoute: routeName),
     );
   }
-}
 
-class _TranscriptLine extends StatelessWidget {
-  const _TranscriptLine({
-    required this.timestamp,
-    required this.speaker,
-    required this.text,
-    this.highlight,
-  });
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
 
-  final String timestamp;
-  final String speaker;
-  final String text;
-  final String? highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    TextSpan buildTextSpan() {
-      if (highlight == null) {
-        return TextSpan(text: '$speaker: $text');
-      }
-
-      final startIndex = text.indexOf(highlight!);
-      if (startIndex == -1) {
-        return TextSpan(text: '$speaker: $text');
-      }
-
-      return TextSpan(
-        children: [
-          TextSpan(text: '${text.substring(0, startIndex)}'),
-          TextSpan(
-            text: highlight,
-            style: const TextStyle(
-              backgroundColor: Color(0xFFFDE68A),
-              color: Colors.black,
-            ),
-          ),
-          TextSpan(text: text.substring(startIndex + highlight!.length)),
-        ],
-      );
+    if (difference.inDays == 0) {
+      return 'Today at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday at ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
     }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: 13,
-          ),
-          children: [
-            TextSpan(
-              text: '$timestamp ',
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 11,
-              ),
-            ),
-            TextSpan(text: '$speaker: '),
-            buildTextSpan(),
-          ],
-        ),
-      ),
-    );
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.iconColor,
-    required this.backgroundColor,
-    required this.title,
-    required this.subtitle,
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.label,
+    required this.value,
   });
 
-  final IconData icon;
-  final Color iconColor;
-  final Color backgroundColor;
-  final String title;
-  final String subtitle;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 13,
             ),
           ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
-
-
-
