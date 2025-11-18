@@ -1,4 +1,4 @@
-package com.example.sequetrics_conversation
+package uk.co.sequetrics.sequetricsconversation
 
 import io.flutter.embedding.android.FlutterActivity
 
