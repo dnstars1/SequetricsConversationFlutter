@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'auth.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000';
-
+  static final String baseUrl = dotenv.env['BACKEND_BASE_URL'] ?? 'http://localhost:8000';
   final AuthService _authService = AuthService();
 
   Future<String> login(String email, String password) async {
